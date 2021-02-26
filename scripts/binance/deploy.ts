@@ -10,9 +10,11 @@ const resultFilePath = path.resolve(__dirname, 'results.json');
 
 const getOrCreateContract = async (
   contractName: string,
-  deployFn: () => Promise<Contract>
+  deployFn: () => Promise<Contract>,
+  contractId?: string
 ): Promise<Contract> => {
-  const address = results[contractName];
+  contractId = contractId || contractName;
+  const address = results[contractId];
   let contract;
   if (address) {
     contract = await isDeployedAt(contractName, address);
@@ -24,15 +26,11 @@ const getOrCreateContract = async (
     }
   }
 
-  console.log(chalk.yellow(`Begin deploy contract ${contractName}`));
+  console.log(chalk.yellow(`Begin deploy contract ${contractId}`));
   contract = await deployFn();
-  results[contractName] = contract.address;
+  results[contractId] = contract.address;
   console.log(
-    chalk.green(
-      `New contract ${contractName.toUpperCase()} is deployed to ${
-        contract.address
-      }`
-    )
+    chalk.green(`New contract ${contractId} is deployed to ${contract.address}`)
   );
   return contract;
 };
@@ -71,28 +69,21 @@ async function main() {
   console.log('Account balance:', (await deployer.getBalance()).toString());
 
   // 0. CONSTANTS
-  const devFund = '';
+  const devFund = '0xa3A502569BF1bfBF7b361964d61335a7530D39e8';
   const vestingStartTime = Math.floor(
     new Date('2021-02-25T09:00:00.000+00:00').getTime() / 1000
   );
   // const busd = {address: '0xe9e7cea3dedca5984780bafc599bd69add087d56'}; // on bsc mainnet
-  const busd = await getOrCreateContract('MockBUSD', async () => {
-    const MockCollateral = await ethers.getContractFactory('MockCollateral');
-    const busd = await MockCollateral.deploy(
-      deployer.address,
-      Numbers.ONE_HUNDRED_MILLION_DEC18,
-      'BUSD',
-      18
-    );
-    return await busd.deployed();
-  });
-  updateVerifyParam(
-    'MockBUSD',
-    deployer.address,
-    Numbers.ONE_HUNDRED_MILLION_DEC18.toString(),
+  const busd = await getOrCreateContract(
     'BUSD',
-    '18'
+    async () => {
+      const MockCollateral = await ethers.getContractFactory('MockCollateral');
+      const busd = await MockCollateral.deploy('BUSD', 'BUSD', 18);
+      return await busd.deployed();
+    },
+    'MockBUSD'
   );
+  updateVerifyParam('MockBUSD', 'BUSD', 'BUSD', '18');
 
   // 1. timelock
   // const timelockDelay = Constants.TIMELOCK_DELAY;
@@ -128,6 +119,7 @@ async function main() {
       'SIL',
       treasury.address,
       devFund,
+      deployer.address,
       vestingStartTime
     );
     return await share.deployed();
@@ -138,6 +130,7 @@ async function main() {
     'SIL',
     treasury.address,
     devFund,
+    deployer.address,
     vestingStartTime.toString()
   );
 
@@ -164,125 +157,105 @@ async function main() {
 
   // 5. Oracles
 
-  // const pcsFactory = '0xBCfCcbde45cE874adCB698cC183deBcF17952812';
+  const vSwapPair_DOLLAR_BUSD = '0xd1571186ef922ac0007a0be28be032792a8f902c';
+  const vSwapPair_SHARE_BUSD = '0xd7558092ac80f90d24da971173a8bf302fbdda45';
 
-  // const oracle_DOLLAR_BUSD = await getOrCreateContract(
-  //   'PancakeSwapPairOracle_DOLLAR_BUSD',
-  //   async () => {
-  //     const PancakeSwapPairOracle = await ethers.getContractFactory(
-  //       'PancakeSwapPairOracle'
-  //     );
-  //     const oracle_DOLLAR_BUSD = await PancakeSwapPairOracle.deploy(
-  //       pcsFactory,
-  //       dollar.address,
-  //       busd
-  //     );
-  //     return await oracle_DOLLAR_BUSD.deployed();
-  //   }
-  // );
-  // updateVerifyParam(
-  //   'PancakeSwapPairOracle_DOLLAR_BUSD',
-  //   pcsFactory,
-  //   dollar.address,
-  //   busd
-  // );
+  const oracle_DOLLAR_BUSD = await getOrCreateContract(
+    'VSwapPairOracle',
+    async () => {
+      const VSwapPairOracle = await ethers.getContractFactory(
+        'VSwapPairOracle'
+      );
+      const oracle_DOLLAR_BUSD = await VSwapPairOracle.deploy(
+        vSwapPair_DOLLAR_BUSD
+      );
+      return await oracle_DOLLAR_BUSD.deployed();
+    },
+    'VSwapPairOracle_DOLLAR_BUSD'
+  );
+  updateVerifyParam('VSwapPairOracle_DOLLAR_BUSD', vSwapPair_DOLLAR_BUSD);
 
-  // const oracle_SHARE_BUSD = await getOrCreateContract(
-  //   'PancakeSwapPairOracle_SHARE_USD',
-  //   async () => {
-  //     const PancakeSwapPairOracle = await ethers.getContractFactory(
-  //       'PancakeSwapPairOracle'
-  //     );
-  //     const oracle_SHARE_USD = await PancakeSwapPairOracle.deploy(
-  //       pcsFactory,
-  //       share.address,
-  //       busd
-  //     );
-  //     return await oracle_SHARE_USD.deployed();
-  //   }
-  // );
-  // updateVerifyParam(
-  //   'PancakeSwapPairOracle_SHARE_USD',
-  //   pcsFactory,
-  //   share.address,
-  //   busd
-  // );
+  const oracle_SHARE_BUSD = await getOrCreateContract(
+    'VSwapPairOracle',
+    async () => {
+      const PancakeSwapPairOracle = await ethers.getContractFactory(
+        'VSwapPairOracle'
+      );
+      const oracle_SHARE_USD = await PancakeSwapPairOracle.deploy(
+        vSwapPair_SHARE_BUSD
+      );
+      return await oracle_SHARE_USD.deployed();
+    },
+    'VSwapPairOracle_SHARE_USD'
+  );
+  updateVerifyParam('VSwapPairOracle_SHARE_USD', vSwapPair_SHARE_BUSD);
 
-  // const chainlinkPriceFeed_BNB_USD =
-  //   '0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE';
-  // const chainlinkPriceFeed_BUSD_BNB =
-  //   '0x87Ea38c9F24264Ec1Fff41B04ec94a97Caf99941';
+  const chainlinkPriceFeed_BUSD_USD =
+    '0x9331b55D9830EF609A2aBCfAc0FBCE050A52fdEa';
 
-  // const oracleBusd = await getOrCreateContract('OracleBusd', async () => {
-  //   const BusdOracle = await ethers.getContractFactory('BusdOracle');
-  //   const oracleBusd = await BusdOracle.deploy(
-  //     chainlinkPriceFeed_BNB_USD,
-  //     chainlinkPriceFeed_BUSD_BNB
-  //   );
-  //   return await oracleBusd.deployed();
-  // });
-  // updateVerifyParam(
-  //   'OracleBusd',
-  //   chainlinkPriceFeed_BNB_USD,
-  //   chainlinkPriceFeed_BUSD_BNB
-  // );
+  const oracleBusd = await getOrCreateContract('OracleBusd', async () => {
+    const BusdOracle = await ethers.getContractFactory('BusdOracle');
+    const oracleBusd = await BusdOracle.deploy(chainlinkPriceFeed_BUSD_USD);
+    return await oracleBusd.deployed();
+  });
+  updateVerifyParam('OracleBusd', chainlinkPriceFeed_BUSD_USD);
 
-  // const oracleDollar = await getOrCreateContract('DollarOracle', async () => {
-  //   const DollarOracle = await ethers.getContractFactory('DollarOracle');
-  //   const oracleDollar = await DollarOracle.deploy(
-  //     dollar.address,
-  //     oracle_DOLLAR_BUSD.address,
-  //     oracleBusd.address
-  //   );
-  //   return await oracleDollar.deployed();
-  // });
-  // updateVerifyParam(
-  //   'DollarOracle',
-  //   dollar.address,
-  //   oracle_DOLLAR_BUSD.address,
-  //   oracleBusd.address
-  // );
+  const oracleDollar = await getOrCreateContract('DollarOracle', async () => {
+    const DollarOracle = await ethers.getContractFactory('DollarOracle');
+    const oracleDollar = await DollarOracle.deploy(
+      dollar.address,
+      oracle_DOLLAR_BUSD.address,
+      oracleBusd.address
+    );
+    return await oracleDollar.deployed();
+  });
+  updateVerifyParam(
+    'DollarOracle',
+    dollar.address,
+    oracle_DOLLAR_BUSD.address,
+    oracleBusd.address
+  );
 
-  // const oracleShare = await getOrCreateContract('ShareOracle', async () => {
-  //   const ShareOracle = await ethers.getContractFactory('ShareOracle');
-  //   const oracleShare = await ShareOracle.deploy(
-  //     share.address,
-  //     oracle_SHARE_BUSD.address,
-  //     oracleBusd.address
-  //   );
-  //   return await oracleShare.deployed();
-  // });
-  // updateVerifyParam(
-  //   'ShareOracle',
-  //   share.address,
-  //   oracle_SHARE_BUSD.address,
-  //   oracleBusd.address
-  // );
+  const oracleShare = await getOrCreateContract('ShareOracle', async () => {
+    const ShareOracle = await ethers.getContractFactory('ShareOracle');
+    const oracleShare = await ShareOracle.deploy(
+      share.address,
+      oracle_SHARE_BUSD.address,
+      oracleBusd.address
+    );
+    return await oracleShare.deployed();
+  });
+  updateVerifyParam(
+    'ShareOracle',
+    share.address,
+    oracle_SHARE_BUSD.address,
+    oracleBusd.address
+  );
 
   // // 6. Tasks
-  // await execute('poolBUSD.setOracle', async () => {
-  //   await poolBUSD.setOracle(oracleBusd.address);
-  // });
+  await execute('poolBUSD.setOracle', async () => {
+    await poolBUSD.setOracle(oracleBusd.address);
+  });
 
-  // await execute('treasury.setDollarAddress', async () => {
-  //   await treasury.setDollarAddress(dollar.address);
-  // });
+  await execute('treasury.setDollarAddress', async () => {
+    await treasury.setDollarAddress(dollar.address);
+  });
 
-  // await execute('treasury.setShareAddress', async () => {
-  //   await treasury.setShareAddress(share.address);
-  // });
+  await execute('treasury.setShareAddress', async () => {
+    await treasury.setShareAddress(share.address);
+  });
 
-  // await execute('treasury.setOracleDollar', async () => {
-  //   await treasury.setOracleDollar(oracleDollar.address);
-  // });
+  await execute('treasury.setOracleDollar', async () => {
+    await treasury.setOracleDollar(oracleDollar.address);
+  });
 
-  // await execute('treasury.setOracleShare', async () => {
-  //   await treasury.setOracleShare(oracleShare.address);
-  // });
+  await execute('treasury.setOracleShare', async () => {
+    await treasury.setOracleShare(oracleShare.address);
+  });
 
-  // await execute('treasury.addPool', async () => {
-  //   await treasury.addPool(poolBUSD.address);
-  // });
+  await execute('treasury.addPool', async () => {
+    await treasury.addPool(poolBUSD.address);
+  });
 }
 
 main()

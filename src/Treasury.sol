@@ -12,7 +12,7 @@ import "./ERC20/ERC20Custom.sol";
 import "./interfaces/ITreasury.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/IPool.sol";
-import "./interfaces/IPancakeSwapRouter.sol";
+import "./interfaces/IValueLiquidRouter.sol";
 
 import "./Operator.sol";
 
@@ -25,6 +25,7 @@ contract Treasury is Operator, ITreasury {
 
     address public dollar;
     address public share;
+    address public strategist;
 
     bool public migrated = false;
 
@@ -58,13 +59,9 @@ contract Treasury is Operator, ITreasury {
     uint256 public rebalance_cooldown = 12 hours;
     uint256 public last_rebalance_timestamp;
 
-    // pancake swap
-    address public pancake_router = 0x05fF2B0DB69458A0750badebc4f9e13aDd608C7F;
-    mapping(address => mapping(address => address[])) private pancake_paths;
-    address public busd_address;
-
-    address private busd_pool;
-    address private strategist;
+    // vswap
+    address public vswap_router;
+    address public vswap_pair;
 
     /* ========== MODIFIERS ========== */
 
@@ -226,21 +223,19 @@ contract Treasury is Operator, ITreasury {
 
     /* -========= INTERNAL FUNCTIONS ============ */
 
-    function _swapToken(
-        address input_token,
-        address output_token,
-        uint256 amount
+    function _swap(
+        address _input_token,
+        address _output_token,
+        uint256 _input_amount,
+        uint256 _min_output_amount
     ) internal {
-        if (amount == 0) return;
-        address[] memory path = pancake_paths[input_token][output_token];
-        if (path.length == 0) {
-            path = new address[](2);
-            path[0] = input_token;
-            path[1] = output_token;
-        }
-        IERC20(input_token).safeApprove(pancake_router, 0);
-        IERC20(input_token).safeApprove(pancake_router, amount);
-        IPancakeSwapRouter(pancake_router).swapExactTokensForTokens(amount, 1, path, address(this), now.add(1800));
+        require(vswap_router != address(0) && vswap_pair != address(0), "!vswap");
+        if (_input_amount == 0) return;
+        address[] memory _path = new address[](1);
+        _path[0] = vswap_pair;
+        IERC20(_input_token).safeApprove(vswap_router, 0);
+        IERC20(_input_token).safeApprove(vswap_router, _input_amount);
+        IValueLiquidRouter(vswap_router).swapExactTokensForTokens(_input_token, _output_token, _input_amount, _min_output_amount, _path, address(this), now.add(1800));
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
@@ -267,35 +262,32 @@ contract Treasury is Operator, ITreasury {
 
     // SINGLE POOL STRATEGY
     // With Treasury v1, we will only utilize collateral from a single pool to do rebalancing
-    function buyback(uint256 _ultilize_ratio) external onlyStrategist notMigrated hasRebalancePool checkRebalanceCooldown {
-        require(_ultilize_ratio > 0 && _ultilize_ratio <= RATIO_PRECISION, ">invalidRatio");
-        (uint256 _collateral_value, bool _exceeded) = calcCollateralBalance();
-        require(_exceeded && _collateral_value > 0, "!exceeded");
+    function buyback(uint256 _collateral_value, uint256 _min_share_amount) external onlyStrategist notMigrated hasRebalancePool checkRebalanceCooldown {
+        (uint256 _excess_collateral_value, bool _exceeded) = calcCollateralBalance();
+        require(_exceeded && _excess_collateral_value > 0, "!exceeded");
+        require(_collateral_value > 0 && _collateral_value < _excess_collateral_value, "invalidCollateralAmount");
         uint256 _collateral_price = IPool(rebalancing_pool).getCollateralPrice();
-        uint256 _collateral_amount_sell = _collateral_value.mul(_ultilize_ratio).div(_collateral_price);
+        uint256 _collateral_amount_sell = _collateral_value.mul(PRICE_PRECISION).div(_collateral_price);
         require(IERC20(rebalancing_pool_collateral).balanceOf(rebalancing_pool) > _collateral_amount_sell, "insufficentPoolBalance");
         IPool(rebalancing_pool).transferCollateralToTreasury(_collateral_amount_sell); // Transfer collateral from pool to treasury
-        _swapToken(rebalancing_pool_collateral, share, _collateral_amount_sell);
+        _swap(rebalancing_pool_collateral, share, _collateral_amount_sell, _min_share_amount);
         emit BoughtBack(_collateral_value);
     }
 
     // SINGLE POOL STRATEGY
     // With Treasury v1, we will only utilize collateral from a single pool to do rebalancing
-    function recollateralize(uint256 _ultilize_ratio) external onlyStrategist notMigrated hasRebalancePool checkRebalanceCooldown {
-        require(_ultilize_ratio > 0 && _ultilize_ratio <= RATIO_PRECISION, ">invalidRatio");
-        (uint256 _collateral_value, bool _exceeded) = calcCollateralBalance();
-        require(!_exceeded && _collateral_value > 0, "exceeded");
-        uint256 _share_amount_sell = _collateral_value.mul(_ultilize_ratio).div(sharePrice());
+    function recollateralize(uint256 _share_amount, uint256 _min_collateral_amount) external onlyStrategist notMigrated hasRebalancePool checkRebalanceCooldown {
+        (uint256 _deficit_collateral_value, bool _exceeded) = calcCollateralBalance();
+        require(!_exceeded && _deficit_collateral_value > 0, "exceeded");
+        require(_min_collateral_amount <= _deficit_collateral_value, ">deficit");
         uint256 _share_balance = IERC20(share).balanceOf(address(this));
-        if (_share_balance < _share_amount_sell) {
-            _share_amount_sell = _share_balance;
-        }
-        _swapToken(share, rebalancing_pool_collateral, _share_amount_sell);
+        require(_share_amount <= _share_balance, ">shareBalance");
+        _swap(share, rebalancing_pool_collateral, _share_amount, _min_collateral_amount);
         uint256 _collateral_balance = IERC20(rebalancing_pool_collateral).balanceOf(address(this));
         if (_collateral_balance > 0) {
             IERC20(share).safeTransfer(rebalancing_pool, _collateral_balance); // Transfer collateral from Treasury to Pool
         }
-        emit Recollateralized(_collateral_value);
+        emit Recollateralized(_share_amount);
     }
 
     function migrate(address _new_treasury) external onlyOperator notMigrated {
@@ -364,8 +356,9 @@ contract Treasury is Operator, ITreasury {
         strategist = _strategist;
     }
 
-    function setPancakeRouter(address _pancake_router) public onlyOperator {
-        pancake_router = _pancake_router;
+    function setVSwapPaparements(address _vswap_router, address _vswap_pair) public onlyOperator {
+        vswap_router = _vswap_router;
+        vswap_pair = _vswap_pair;
     }
 
     function setRebalancePool(address _rebalance_pool) public onlyOperator {
@@ -377,14 +370,6 @@ contract Treasury is Operator, ITreasury {
 
     function setRebalanceCooldown(uint256 _rebalance_cooldown) public onlyOperator {
         rebalance_cooldown = _rebalance_cooldown;
-    }
-
-    function setPancakeRouterPath(
-        address _input,
-        address _output,
-        address[] memory _path
-    ) external onlyOperator {
-        pancake_paths[_input][_output] = _path;
     }
 
     /* ========== EMERGENCY ========== */

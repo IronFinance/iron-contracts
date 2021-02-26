@@ -1,9 +1,9 @@
 {
-  "name": "iron-contracts",
+  "name": "ironbank-contracts",
   "version": "1.0.0",
   "description": "IRON Bank solidity contracts",
-  "repository": "github:ironfinance/iron-contracts",
-  "author": "oramis",
+  "repository": "github:ironbankfi/ironbank-contracts",
+  "author": "wighawag",
   "license": "MIT",
   "keywords": [
     "ethereum",

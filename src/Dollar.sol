@@ -18,11 +18,7 @@ contract Dollar is ERC20Custom, IDollar, Operator {
     string public name;
     uint8 public constant decimals = 18;
     address public treasury;
-
     uint256 public constant genesis_supply = 5000 ether; // 5000 will be mited at genesis for liq pool seeding
-
-    // Constants for various precisions
-    uint256 private constant PRICE_PRECISION = 1e6;
 
     /* ========== MODIFIERS ========== */
 
