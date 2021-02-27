@@ -16,20 +16,25 @@ contract Share is ERC20Custom, Operator {
 
     /* ========== STATE VARIABLES ========== */
 
-    uint256 public constant FARMING_POOL_REWARD_ALLOCATION = 84000000 ether; // 84M
-    uint256 public constant DEV_FUND_POOL_ALLOCATION = 16000000 ether; // 16M
-
+    // ERC20 - Token
     string public symbol;
     string public name;
     uint8 public constant decimals = 18;
+
+    // CONTRACTS
     address public treasury;
 
-    uint256 public constant VESTING_DURATION = 365 days; // 6 months
+    // FLAGS
+    bool public initialized;
+
+    // DISTRIBUTION
+    uint256 public constant FARMING_POOL_REWARD_ALLOCATION = 84000000 ether; // 84M
+    uint256 public constant DEV_FUND_POOL_ALLOCATION = 16000000 ether; // 16M
+    uint256 public constant VESTING_DURATION = 365 days; // 12 months
     uint256 public startTime; // Start time of vesting duration
     uint256 public endTime = startTime + VESTING_DURATION; // End of vesting duration
-
     address public devFund;
-    address public rewardController;
+    address public rewardController; // Holding SHARE tokens to distribute into Liquiditiy Mining Pools
     uint256 public devFundLastClaimed;
     uint256 public devFundRewardRate = DEV_FUND_POOL_ALLOCATION / VESTING_DURATION;
 
@@ -45,14 +50,20 @@ contract Share is ERC20Custom, Operator {
     constructor(
         string memory _name,
         string memory _symbol,
-        address _treasury,
-        address _devFund,
-        address _rewardController,
-        uint256 _startTime
+        address _treasury
     ) public {
         name = _name;
         symbol = _symbol;
         treasury = _treasury;
+    }
+
+    function initialize(
+        address _devFund,
+        address _rewardController,
+        uint256 _startTime
+    ) external onlyOperator {
+        require(!initialized, "alreadyInitialized");
+        initialized = true;
         devFund = _devFund;
         rewardController = _rewardController;
         startTime = _startTime;
@@ -72,7 +83,7 @@ contract Share is ERC20Custom, Operator {
         devFund = _devFund;
     }
 
-    // This function is what other Pools will call to mint new Share
+    // This function is what other Pools will call to mint new SHARE
     function poolMint(address m_address, uint256 m_amount) external onlyPools {
         super._mint(m_address, m_amount);
         emit ShareMinted(address(this), m_address, m_amount);
@@ -89,22 +100,6 @@ contract Share is ERC20Custom, Operator {
         if (_now > endTime) _now = endTime;
         if (devFundLastClaimed >= _now) return 0;
         _pending = _now.sub(devFundLastClaimed).mul(devFundRewardRate);
-    }
-
-    /* ========== OVERRIDDEN PUBLIC FUNCTIONS ========== */
-
-    function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
-        _transfer(_msgSender(), recipient, amount);
-        return true;
-    }
-
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) public virtual override returns (bool) {
-        _transfer(sender, recipient, amount);
-        return true;
     }
 
     function claimRewards() external {

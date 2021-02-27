@@ -33,27 +33,18 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const MockChainlinkAggregator = await deployments.getArtifact(
     'MockChainlinkAggregator'
   );
-  const mockPriceFeed_BNB_USD = await deploy(
-    'MockChainlinkAggregator_BNB_USD',
+  const mockPriceFeed_BUSD_USD = await deploy(
+    'MockChainlinkAggregator_BUSD_USD',
     {
       contract: MockChainlinkAggregator,
-      args: ['30000000000', 8],
-      from: creator,
-      log: true,
-    }
-  );
-  const mockPriceFeed_BUSD_BNB = await deploy(
-    'MockChainlinkAggregator_BNB_USD',
-    {
-      contract: MockChainlinkAggregator,
-      args: ['333323', 8],
+      args: ['100498532', 8],
       from: creator,
       log: true,
     }
   );
 
   const oracleBusd = await deploy('BusdOracle', {
-    args: [mockPriceFeed_BNB_USD.address, mockPriceFeed_BUSD_BNB.address],
+    args: [mockPriceFeed_BUSD_USD.address],
     from: creator,
     log: true,
   });

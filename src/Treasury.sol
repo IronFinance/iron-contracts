@@ -65,11 +65,6 @@ contract Treasury is Operator, ITreasury {
 
     /* ========== MODIFIERS ========== */
 
-    modifier onlyPools() {
-        require(pools[msg.sender] == true, "Only Pools can call this function");
-        _;
-    }
-
     modifier onlyStrategist() {
         require(strategist == msg.sender, "!strategist");
         _;
@@ -113,12 +108,10 @@ contract Treasury is Operator, ITreasury {
 
     /* ========== VIEWS ========== */
 
-    // Returns n DOLLAR = 1 USD
     function dollarPrice() public view returns (uint256) {
         return IOracle(oracleDollar).consult();
     }
 
-    // Returns n SHARE = 1 USD
     function sharePrice() public view returns (uint256) {
         return IOracle(oracleShare).consult();
     }
@@ -127,8 +120,6 @@ contract Treasury is Operator, ITreasury {
         return pools[_address] == true;
     }
 
-    // This is needed to avoid costly repeat calls to different getter functions
-    // It is cheaper gas-wise to just dump everything and only use some of the info
     function info()
         external
         view
@@ -200,6 +191,7 @@ contract Treasury is Operator, ITreasury {
             }
         }
 
+        // If using ECR, then calcECR. If not, update ECR = TCR
         if (using_effective_collateral_ratio) {
             effective_collateral_ratio = calcEffectiveCollateralRatio();
         } else {
@@ -209,6 +201,7 @@ contract Treasury is Operator, ITreasury {
         last_refresh_cr_timestamp = block.timestamp;
     }
 
+    // Check if the protocol is over- or under-collateralized, by how much
     function calcCollateralBalance() public view returns (uint256 _collateral_value, bool _exceeded) {
         uint256 total_collateral_value = globalCollateralValue();
         uint256 target_collateral_value = IERC20(dollar).totalSupply().mul(target_collateral_ratio).div(PRICE_PRECISION);
@@ -223,6 +216,7 @@ contract Treasury is Operator, ITreasury {
 
     /* -========= INTERNAL FUNCTIONS ============ */
 
+    // SWAP tokens using vSwap
     function _swap(
         address _input_token,
         address _output_token,
@@ -239,7 +233,8 @@ contract Treasury is Operator, ITreasury {
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
-    // Add new DOLLAR pool. Adds collateral addresses supported, such as tether and busd, must be ERC20
+
+    // Add new Pool
     function addPool(address pool_address) public onlyOperator notMigrated {
         require(pools[pool_address] == false, "poolExisted");
         pools[pool_address] = true;
@@ -285,7 +280,7 @@ contract Treasury is Operator, ITreasury {
         _swap(share, rebalancing_pool_collateral, _share_amount, _min_collateral_amount);
         uint256 _collateral_balance = IERC20(rebalancing_pool_collateral).balanceOf(address(this));
         if (_collateral_balance > 0) {
-            IERC20(share).safeTransfer(rebalancing_pool, _collateral_balance); // Transfer collateral from Treasury to Pool
+            IERC20(rebalancing_pool_collateral).safeTransfer(rebalancing_pool, _collateral_balance); // Transfer collateral from Treasury to Pool
         }
         emit Recollateralized(_share_amount);
     }
@@ -356,7 +351,7 @@ contract Treasury is Operator, ITreasury {
         strategist = _strategist;
     }
 
-    function setVSwapPaparements(address _vswap_router, address _vswap_pair) public onlyOperator {
+    function setVSwapParams(address _vswap_router, address _vswap_pair) public onlyOperator {
         vswap_router = _vswap_router;
         vswap_pair = _vswap_pair;
     }
@@ -387,7 +382,6 @@ contract Treasury is Operator, ITreasury {
         } else {
             callData = abi.encodePacked(bytes4(keccak256(bytes(signature))), data);
         }
-
         // solium-disable-next-line security/no-call-value
         (bool success, bytes memory returnData) = target.call{value: value}(callData);
         require(success, string("Treasury::executeTransaction: Transaction execution reverted."));

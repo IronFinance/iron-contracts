@@ -19,10 +19,6 @@ contract BusdOracle is Operator, IOracle {
     }
 
     function consult() external view override returns (uint256) {
-        return _priceBusdUsd();
-    }
-
-    function _priceBusdUsd() private view returns (uint256) {
         AggregatorV3Interface _priceFeed = AggregatorV3Interface(chainlinkBusdUsd);
         (, int256 _price, , , ) = _priceFeed.latestRoundData();
         uint8 _decimals = _priceFeed.decimals();

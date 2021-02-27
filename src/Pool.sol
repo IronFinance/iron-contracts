@@ -237,8 +237,7 @@ contract Pool is Operator, ReentrancyGuard, IPool {
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
-    // move collateral to new address;
-    // make sure unclaimed must be claimed before burn / transfer
+    // move collateral to new pool address
     function migrate(address _new_pool) external override nonReentrant onlyOperator notMigrated {
         migrated = true;
         uint256 availableCollateral = COLLATERAL.balanceOf(address(this)).sub(unclaimed_pool_collateral);
@@ -269,6 +268,7 @@ contract Pool is Operator, ReentrancyGuard, IPool {
         treasury = _treasury;
     }
 
+    // Transfer collateral to Treasury to execute strategies
     function transferCollateralToTreasury(uint256 amount) external override onlyTreasury {
         require(amount > 0, "zeroAmount");
         COLLATERAL.safeTransfer(treasury, amount);

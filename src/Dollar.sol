@@ -14,11 +14,18 @@ import "./Operator.sol";
 
 contract Dollar is ERC20Custom, IDollar, Operator {
     using SafeMath for uint256;
+
+    // ERC20
     string public symbol;
     string public name;
     uint8 public constant decimals = 18;
-    address public treasury;
     uint256 public constant genesis_supply = 5000 ether; // 5000 will be mited at genesis for liq pool seeding
+
+    // CONTRACTS
+    address public treasury;
+
+    // FLAGS
+    bool public initialized;
 
     /* ========== MODIFIERS ========== */
 
@@ -37,18 +44,23 @@ contract Dollar is ERC20Custom, IDollar, Operator {
         name = _name;
         symbol = _symbol;
         treasury = _treasury;
+    }
+
+    function initialize() external onlyOperator {
+        require(!initialized, "alreadyInitialized");
+        initialized = true;
         _mint(_msgSender(), genesis_supply);
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
-    // Used by pools when user redeems
+    // Burn DOLLAR. Can be used by Pool only
     function poolBurnFrom(address _address, uint256 _amount) external override onlyPools {
         super._burnFrom(_address, _amount);
         emit DollarBurned(_address, msg.sender, _amount);
     }
 
-    // This function is what other pools will call to mint new DOLLAR
+    // Mint DOLLAR. Can be used by Pool only
     function poolMint(address _address, uint256 _amount) external override onlyPools {
         super._mint(_address, _amount);
         emit DollarMinted(msg.sender, _address, _amount);

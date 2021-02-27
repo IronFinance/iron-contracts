@@ -8,35 +8,35 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const {deployments, getNamedAccounts} = hre;
   const {deploy, execute} = deployments;
   const {creator} = await getNamedAccounts();
-  const MockPancakeSwapRouter = await deployments.getArtifact(
-    'MockPancakeSwapRouter'
-  );
-  const mockPancakeSwapRouter = await deploy('MockPancakeSwapRouter', {
-    contract: MockPancakeSwapRouter,
-    args: [],
-    from: creator,
-    log: true,
-  });
+  // const MockPancakeSwapRouter = await deployments.getArtifact(
+  //   'MockPancakeSwapRouter'
+  // );
+  // const mockPancakeSwapRouter = await deploy('MockPancakeSwapRouter', {
+  //   contract: MockPancakeSwapRouter,
+  //   args: [],
+  //   from: creator,
+  //   log: true,
+  // });
 
-  console.log(mockPancakeSwapRouter.address);
+  // console.log(mockPancakeSwapRouter.address);
 
-  await execute(
-    'Treasury',
-    {
-      from: creator,
-    },
-    'setPancakeRouter',
-    mockPancakeSwapRouter.address
-  );
+  // await execute(
+  //   'Treasury',
+  //   {
+  //     from: creator,
+  //   },
+  //   'setPancakeRouter',
+  //   mockPancakeSwapRouter.address
+  // );
 
-  await execute(
-    'Treasury',
-    {
-      from: creator,
-    },
-    'setRebalancePool',
-    addresses.poolBUSD
-  );
+  // await execute(
+  //   'Treasury',
+  //   {
+  //     from: creator,
+  //   },
+  //   'setRebalancePool',
+  //   addresses.poolBUSD
+  // );
 };
 
 export default func;

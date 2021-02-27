@@ -29,19 +29,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     log: true,
   });
 
-  const startTime = Math.floor(
-    new Date('2021-02-25T09:00:00.000+00:00').getTime() / 1000
-  );
   const share = await deploy('Share', {
     from: deployer,
-    args: [
-      'SIL - IRON Bank Share',
-      'SIL',
-      treasury.address,
-      devFund,
-      creator,
-      startTime,
-    ],
+    args: ['SIL - IRON Bank Share', 'SIL', treasury.address],
     log: true,
   });
 
@@ -57,6 +47,20 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     {from: creator, log: true},
     'setShareAddress',
     share.address
+  );
+
+  await execute('Dollar', {from: creator, log: true}, 'initialize');
+
+  const startTime = Math.floor(
+    new Date('2021-02-25T09:00:00.000+00:00').getTime() / 1000
+  );
+  await execute(
+    'Share',
+    {from: creator, log: true},
+    'initialize',
+    devFund,
+    creator,
+    startTime
   );
 
   setContractAddresses({
