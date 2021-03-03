@@ -28,8 +28,8 @@ contract Share is ERC20Custom, Operator {
     bool public initialized;
 
     // DISTRIBUTION
-    uint256 public constant COMMUNITY_REWARD_ALLOCATION = 84000000 ether; // 84M
-    uint256 public constant DEV_FUND_ALLOCATION = 16000000 ether; // 16M
+    uint256 public constant COMMUNITY_REWARD_ALLOCATION = 80000000 ether; // 84M
+    uint256 public constant DEV_FUND_ALLOCATION = 20000000 ether; // 16M
     uint256 public constant VESTING_DURATION = 365 days; // 12 months
     uint256 public startTime; // Start time of vesting duration
     uint256 public endTime = startTime + VESTING_DURATION; // End of vesting duration
