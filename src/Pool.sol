@@ -27,11 +27,6 @@ contract Pool is Operator, ReentrancyGuard, IPool {
     address public treasury;
     address public share;
 
-    ERC20 private COLLATERAL;
-    IShare private SHARE;
-    IDollar private DOLLAR;
-    ITreasury private TREASURY;
-
     mapping(address => uint256) public redeem_share_balances;
     mapping(address => uint256) public redeem_collateral_balances;
 
@@ -80,16 +75,12 @@ contract Pool is Operator, ReentrancyGuard, IPool {
         address _treasury,
         uint256 _pool_ceiling
     ) public {
-        DOLLAR = IDollar(_dollar);
-        SHARE = IShare(_share);
-        TREASURY = ITreasury(_treasury);
         dollar = _dollar;
         share = _share;
         collateral = _collateral;
         treasury = _treasury;
-        COLLATERAL = ERC20(_collateral);
         pool_ceiling = _pool_ceiling;
-        missing_decimals = uint256(18).sub(COLLATERAL.decimals());
+        missing_decimals = uint256(18).sub(ERC20(_collateral).decimals());
     }
 
     /* ========== VIEWS ========== */
@@ -97,7 +88,7 @@ contract Pool is Operator, ReentrancyGuard, IPool {
     // Returns dollar value of collateral held in this pool
     function collateralDollarBalance() external view override returns (uint256) {
         uint256 collateral_usd_price = getCollateralPrice();
-        return (COLLATERAL.balanceOf(address(this)).sub(unclaimed_pool_collateral)).mul(10**missing_decimals).mul(collateral_usd_price).div(PRICE_PRECISION);
+        return (ERC20(collateral).balanceOf(address(this)).sub(unclaimed_pool_collateral)).mul(10**missing_decimals).mul(collateral_usd_price).div(PRICE_PRECISION);
     }
 
     function info()
@@ -115,7 +106,7 @@ contract Pool is Operator, ReentrancyGuard, IPool {
     {
         return (
             pool_ceiling, // Ceiling of pool - collateral-amount
-            COLLATERAL.balanceOf(address(this)), // amount of COLLATERAL locked in this contract
+            ERC20(collateral).balanceOf(address(this)), // amount of COLLATERAL locked in this contract
             unclaimed_pool_collateral, // unclaimed amount of COLLATERAL
             unclaimed_pool_share, // unclaimed amount of SHARE
             getCollateralPrice(), // collateral price
@@ -140,9 +131,8 @@ contract Pool is Operator, ReentrancyGuard, IPool {
         uint256 _dollar_out_min
     ) external notMigrated {
         require(mint_paused == false, "Minting is paused");
-        (, uint256 _share_price, , uint256 _target_collateral_ratio, , , uint256 _minting_fee, ) = TREASURY.info();
-        require(COLLATERAL.balanceOf(address(this)).sub(unclaimed_pool_collateral).add(_collateral_amount) <= pool_ceiling, ">poolCeiling");
-
+        (, uint256 _share_price, , uint256 _target_collateral_ratio, , , uint256 _minting_fee, ) = ITreasury(treasury).info();
+        require(ERC20(collateral).balanceOf(address(this)).sub(unclaimed_pool_collateral).add(_collateral_amount) <= pool_ceiling, ">poolCeiling");
         uint256 _price_collateral = getCollateralPrice();
         uint256 _collateral_value = (_collateral_amount * (10**missing_decimals)).mul(_price_collateral).div(PRICE_PRECISION);
         uint256 _total_dollar_value = _collateral_value.mul(COLLATERAL_RATIO_PRECISION).div(_target_collateral_ratio);
@@ -152,9 +142,13 @@ contract Pool is Operator, ReentrancyGuard, IPool {
         require(_dollar_out_min <= _actual_dollar_amount, ">slippage");
         require(_required_share_amount <= _share_amount, "<shareBalance");
 
-        SHARE.poolBurnFrom(msg.sender, _required_share_amount);
-        COLLATERAL.transferFrom(msg.sender, address(this), _collateral_amount);
-        DOLLAR.poolMint(msg.sender, _actual_dollar_amount);
+        if (_required_share_amount > 0) {
+            IShare(share).poolBurnFrom(msg.sender, _required_share_amount);
+        }
+        if (_collateral_amount > 0) {
+            ERC20(collateral).transferFrom(msg.sender, address(this), _collateral_amount);
+        }
+        IDollar(dollar).poolMint(msg.sender, _actual_dollar_amount);
     }
 
     function redeem(
@@ -163,7 +157,7 @@ contract Pool is Operator, ReentrancyGuard, IPool {
         uint256 _collateral_out_min
     ) external notMigrated {
         require(redeem_paused == false, "Redeeming is paused");
-        (, uint256 _share_price, , , uint256 _effective_collateral_ratio, , , uint256 _redemption_fee) = TREASURY.info();
+        (, uint256 _share_price, , , uint256 _effective_collateral_ratio, , , uint256 _redemption_fee) = ITreasury(treasury).info();
         uint256 _collateral_price = getCollateralPrice();
         uint256 _dollar_amount_post_fee = _dollar_amount.sub((_dollar_amount.mul(_redemption_fee)).div(PRICE_PRECISION));
         uint256 _collateral_output_amount = 0;
@@ -192,13 +186,13 @@ contract Pool is Operator, ReentrancyGuard, IPool {
         last_redeemed[msg.sender] = block.number;
 
         // Check if collateral balance meets and meet output expectation
-        require(_collateral_output_amount <= COLLATERAL.balanceOf(address(this)).sub(unclaimed_pool_collateral), "<collateralBlanace");
+        require(_collateral_output_amount <= ERC20(collateral).balanceOf(address(this)).sub(unclaimed_pool_collateral), "<collateralBlanace");
         require(_collateral_out_min <= _collateral_output_amount && _share_out_min <= _share_output_amount, ">slippage");
 
         // Move all external functions to the end
-        DOLLAR.poolBurnFrom(msg.sender, _dollar_amount_post_fee);
+        IDollar(dollar).poolBurnFrom(msg.sender, _dollar_amount);
         if (_share_output_amount > 0) {
-            SHARE.poolMint(address(this), _share_output_amount);
+            IShare(share).poolMint(address(this), _share_output_amount);
         }
     }
 
@@ -227,11 +221,11 @@ contract Pool is Operator, ReentrancyGuard, IPool {
         }
 
         if (_send_share == true) {
-            IERC20(share).transfer(msg.sender, _share_amount);
+            ERC20(share).transfer(msg.sender, _share_amount);
         }
 
         if (_send_collateral == true) {
-            COLLATERAL.transfer(msg.sender, _collateral_amount);
+            ERC20(collateral).transfer(msg.sender, _collateral_amount);
         }
     }
 
@@ -240,8 +234,8 @@ contract Pool is Operator, ReentrancyGuard, IPool {
     // move collateral to new pool address
     function migrate(address _new_pool) external override nonReentrant onlyOperator notMigrated {
         migrated = true;
-        uint256 availableCollateral = COLLATERAL.balanceOf(address(this)).sub(unclaimed_pool_collateral);
-        COLLATERAL.transfer(_new_pool, availableCollateral);
+        uint256 availableCollateral = ERC20(collateral).balanceOf(address(this)).sub(unclaimed_pool_collateral);
+        ERC20(collateral).transfer(_new_pool, availableCollateral);
     }
 
     function toggleMinting() external onlyOperator {
@@ -271,6 +265,7 @@ contract Pool is Operator, ReentrancyGuard, IPool {
     // Transfer collateral to Treasury to execute strategies
     function transferCollateralToTreasury(uint256 amount) external override onlyTreasury {
         require(amount > 0, "zeroAmount");
-        COLLATERAL.safeTransfer(treasury, amount);
+        require(treasury != address(0), "invalidTreasury");
+        ERC20(collateral).safeTransfer(treasury, amount);
     }
 }

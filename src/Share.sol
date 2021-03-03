@@ -28,15 +28,16 @@ contract Share is ERC20Custom, Operator {
     bool public initialized;
 
     // DISTRIBUTION
-    uint256 public constant FARMING_POOL_REWARD_ALLOCATION = 84000000 ether; // 84M
-    uint256 public constant DEV_FUND_POOL_ALLOCATION = 16000000 ether; // 16M
+    uint256 public constant COMMUNITY_REWARD_ALLOCATION = 84000000 ether; // 84M
+    uint256 public constant DEV_FUND_ALLOCATION = 16000000 ether; // 16M
     uint256 public constant VESTING_DURATION = 365 days; // 12 months
     uint256 public startTime; // Start time of vesting duration
     uint256 public endTime = startTime + VESTING_DURATION; // End of vesting duration
     address public devFund;
     address public rewardController; // Holding SHARE tokens to distribute into Liquiditiy Mining Pools
     uint256 public devFundLastClaimed;
-    uint256 public devFundRewardRate = DEV_FUND_POOL_ALLOCATION / VESTING_DURATION;
+    uint256 public devFundEmissionRate = DEV_FUND_ALLOCATION / VESTING_DURATION;
+    uint256 public communityRewardClaimed;
 
     /* ========== MODIFIERS ========== */
 
@@ -63,12 +64,22 @@ contract Share is ERC20Custom, Operator {
         uint256 _startTime
     ) external onlyOperator {
         require(!initialized, "alreadyInitialized");
+        require(_rewardController != address(0), "!rewardController");
         initialized = true;
         devFund = _devFund;
         rewardController = _rewardController;
         startTime = _startTime;
         devFundLastClaimed = _startTime;
-        _mint(rewardController, FARMING_POOL_REWARD_ALLOCATION); // distribute shares to add into mining pool
+    }
+
+    function claimCommunityRewards(uint256 amount) external onlyOperator {
+        require(amount > 0, "invalidAmount");
+        require(initialized, "!initialized");
+        require(rewardController != address(0), "!rewardController");
+        uint256 _remainingRewards = COMMUNITY_REWARD_ALLOCATION.sub(communityRewardClaimed);
+        require(amount <= _remainingRewards, "exceedRewards");
+        communityRewardClaimed = communityRewardClaimed.add(amount);
+        _mint(rewardController, amount);
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
@@ -99,10 +110,10 @@ contract Share is ERC20Custom, Operator {
         uint256 _now = block.timestamp;
         if (_now > endTime) _now = endTime;
         if (devFundLastClaimed >= _now) return 0;
-        _pending = _now.sub(devFundLastClaimed).mul(devFundRewardRate);
+        _pending = _now.sub(devFundLastClaimed).mul(devFundEmissionRate);
     }
 
-    function claimRewards() external {
+    function claimDevFundRewards() external {
         uint256 _pending = unclaimedDevFund();
         if (_pending > 0 && devFund != address(0)) {
             _mint(devFund, _pending);

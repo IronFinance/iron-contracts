@@ -13,7 +13,7 @@ contract VSwapPairOracle is Operator, IPairOracle {
     using FixedPoint for *;
     using SafeMath for uint256;
 
-    uint256 public PERIOD = 3600; // 1 hour TWAP (time-weighted average price)
+    uint256 public PERIOD = 600; // 10-minute TWAP (time-weighted average price)
 
     IValueLiquidPair public immutable pair;
     address public immutable token0;

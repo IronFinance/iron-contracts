@@ -18,15 +18,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     getContractAddress('oracle_DOLLAR_BUSD'),
     creator
   );
-  const oracle_SHARE_BUSD = await ethers.getContractAt(
+  const oracle_SHARE_BNB = await ethers.getContractAt(
     'VSwapPairOracle',
-    getContractAddress('oracle_SHARE_BUSD'),
+    getContractAddress('oracle_SHARE_BNB'),
     creator
   );
   await oracle_DOLLAR_BUSD.setPeriod(1);
-  await oracle_SHARE_BUSD.setPeriod(1);
+  await oracle_SHARE_BNB.setPeriod(1);
 
   await oracle_DOLLAR_BUSD.update();
-  await oracle_SHARE_BUSD.update();
+  await oracle_SHARE_BNB.update();
 };
 export default func;

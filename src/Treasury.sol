@@ -61,7 +61,8 @@ contract Treasury is Operator, ITreasury {
 
     // vswap
     address public vswap_router;
-    address public vswap_pair;
+    address public vswap_pair_bnb_busd;
+    address public vswap_pair_share_bnb;
 
     /* ========== MODIFIERS ========== */
 
@@ -223,10 +224,16 @@ contract Treasury is Operator, ITreasury {
         uint256 _input_amount,
         uint256 _min_output_amount
     ) internal {
-        require(vswap_router != address(0) && vswap_pair != address(0), "!vswap");
+        require(vswap_router != address(0) && vswap_pair_share_bnb != address(0) && vswap_pair_bnb_busd != address(0), "!vswap");
         if (_input_amount == 0) return;
-        address[] memory _path = new address[](1);
-        _path[0] = vswap_pair;
+        address[] memory _path = new address[](2);
+        if (_input_token == share) {
+            _path[0] = vswap_pair_share_bnb;
+            _path[1] = vswap_pair_bnb_busd;
+        } else {
+            _path[0] = vswap_pair_bnb_busd;
+            _path[1] = vswap_pair_share_bnb;
+        }
         IERC20(_input_token).safeApprove(vswap_router, 0);
         IERC20(_input_token).safeApprove(vswap_router, _input_amount);
         IValueLiquidRouter(vswap_router).swapExactTokensForTokens(_input_token, _output_token, _input_amount, _min_output_amount, _path, address(this), now.add(1800));
@@ -351,9 +358,14 @@ contract Treasury is Operator, ITreasury {
         strategist = _strategist;
     }
 
-    function setVSwapParams(address _vswap_router, address _vswap_pair) public onlyOperator {
+    function setVSwapParams(
+        address _vswap_router,
+        address _vswap_pair_share_bnb,
+        address _vswap_pair_bnb_busd
+    ) public onlyOperator {
         vswap_router = _vswap_router;
-        vswap_pair = _vswap_pair;
+        vswap_pair_share_bnb = _vswap_pair_share_bnb;
+        vswap_pair_bnb_busd = _vswap_pair_bnb_busd;
     }
 
     function setRebalancePool(address _rebalance_pool) public onlyOperator {

@@ -11,33 +11,40 @@ import "../interfaces/IPairOracle.sol";
 
 contract ShareOracle is Operator, IOracle {
     using SafeMath for uint256;
-    address public oracleShareBusd;
-    address public oracleBusdUsd;
+    address public oracleShareBnb;
+    address public chainlinkBnbUsd;
     address public share;
 
     uint256 private constant PRICE_PRECISION = 1e6;
 
     constructor(
         address _share,
-        address _oracleShareBusd,
-        address _oracleBusdUsd
+        address _oracleShareBnb,
+        address _chainlinkBnbUsd
     ) public {
         share = _share;
-        oracleBusdUsd = _oracleBusdUsd;
-        oracleShareBusd = _oracleShareBusd;
+        chainlinkBnbUsd = _chainlinkBnbUsd;
+        oracleShareBnb = _oracleShareBnb;
     }
 
     function consult() external view override returns (uint256) {
-        uint256 _priceBusdUsd = IOracle(oracleBusdUsd).consult();
-        uint256 _priceShareBnb = IPairOracle(oracleShareBusd).consult(share, PRICE_PRECISION);
-        return _priceBusdUsd.mul(_priceShareBnb).div(PRICE_PRECISION);
+        uint256 _priceBnbUsd = priceBnbUsd();
+        uint256 _priceShareBnb = IPairOracle(oracleShareBnb).consult(share, PRICE_PRECISION);
+        return _priceBnbUsd.mul(_priceShareBnb).div(PRICE_PRECISION);
     }
 
-    function setOracleBusdUsd(address _oracleBusdUsd) external onlyOperator {
-        oracleBusdUsd = _oracleBusdUsd;
+    function priceBnbUsd() internal view returns (uint256) {
+        AggregatorV3Interface _priceFeed = AggregatorV3Interface(chainlinkBnbUsd);
+        (, int256 _price, , , ) = _priceFeed.latestRoundData();
+        uint8 _decimals = _priceFeed.decimals();
+        return uint256(_price).mul(PRICE_PRECISION).div(uint256(10)**_decimals);
     }
 
-    function setOracleShareBusd(address _oracleShareBusd) external onlyOperator {
-        oracleShareBusd = _oracleShareBusd;
+    function setChainlinkBnbUsd(address _chainlinkBnbUsd) external onlyOperator {
+        chainlinkBnbUsd = _chainlinkBnbUsd;
+    }
+
+    function setOracleShareBnb(address _oracleShareBnb) external onlyOperator {
+        oracleShareBnb = _oracleShareBnb;
     }
 }

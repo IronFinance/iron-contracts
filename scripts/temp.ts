@@ -7,10 +7,10 @@ async function main() {
   console.log('Account balance:', (await deployer.getBalance()).toString());
   const share = await ethers.getContract('Share', deployer);
   // const dollar = await ethers.getContract('Dollar', deployer);
+  // await dollar.transfer(user, Numbers.ONE_DEC18.mul(2000));
   const busd = await ethers.getContract('MockBUSD', deployer);
   const user = '';
   await share.transfer(user, Numbers.ONE_DEC18.mul(125));
-  // await dollar.transfer(user, Numbers.ONE_DEC18.mul(2000));
   await busd.mint(user, Numbers.ONE_DEC18.mul(100000));
   await deployer.sendTransaction({to: user, value: Numbers.ONE_DEC18.mul(334)});
 }

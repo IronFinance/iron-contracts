@@ -17,8 +17,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     args: [creator, 'BUSD', 18],
     log: true,
   });
+  const wbnb = await deploy('MockWBNB', {
+    contract: MockCollateral,
+    from: creator,
+    args: [creator, 'BUSD', 18],
+    log: true,
+  });
   setContractAddresses({
     busd: busd.address,
+    wbnb: wbnb.address,
   });
 };
 export default func;

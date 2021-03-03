@@ -18,15 +18,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     from: creator,
     log: true,
   });
-  const oracle_SHARE_BUSD = await deploy('PairOracle_SHARE_BUSD', {
+  const oracle_SHARE_BNB = await deploy('PairOracle_SHARE_BNB', {
     contract: MockPairOracle,
-    args: [4100392],
+    args: [20000],
     from: creator,
     log: true,
   });
 
   setContractAddress('oracle_DOLLAR_BUSD', oracle_DOLLAR_BUSD.address);
-  setContractAddress('oracle_SHARE_BUSD', oracle_SHARE_BUSD.address);
+  setContractAddress('oracle_SHARE_BNB', oracle_SHARE_BNB.address);
 
   console.log(chalk.yellow('===== LINK ORACLES ====='));
 
@@ -38,6 +38,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     {
       contract: MockChainlinkAggregator,
       args: ['100498532', 8],
+      from: creator,
+      log: true,
+    }
+  );
+  const mockPriceFeed_BNB_USD = await deploy(
+    'MockChainlinkAggregator_BNB_USD',
+    {
+      contract: MockChainlinkAggregator,
+      args: ['25124633000', 8],
       from: creator,
       log: true,
     }
@@ -56,7 +65,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   });
 
   const oracleShare = await deploy('ShareOracle', {
-    args: [addresses.share, oracle_SHARE_BUSD.address, oracleBusd.address],
+    args: [
+      addresses.share,
+      oracle_SHARE_BNB.address,
+      mockPriceFeed_BNB_USD.address,
+    ],
     from: creator,
     log: true,
   });
