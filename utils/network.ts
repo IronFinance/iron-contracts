@@ -44,6 +44,6 @@ export function accounts(networkName?: string): {mnemonic: string} {
 
 export const etherscanApiKey = (): string => {
   return (
-    process.env['ETHERSCAN_API_KEY'] || 'QSNF1YA28E279HSW9BYBPMB8ZG99KZS3TS'
+    process.env['ETHERSCAN_API_KEY'] || ''
   );
 };

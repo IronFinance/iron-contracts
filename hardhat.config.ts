@@ -32,7 +32,6 @@ const config: HardhatUserConfig = {
     governor_guardian_address: 0,
     dummy: 7,
     test_deployer: 3,
-    user: '0x03DbFDC27697b311B38C1934c38bD97905C46Ed0',
   },
   networks: {
     hardhat: {
