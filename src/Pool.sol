@@ -134,15 +134,22 @@ contract Pool is Operator, ReentrancyGuard, IPool {
         (, uint256 _share_price, , uint256 _target_collateral_ratio, , , uint256 _minting_fee, ) = ITreasury(treasury).info();
         require(ERC20(collateral).balanceOf(address(this)).sub(unclaimed_pool_collateral).add(_collateral_amount) <= pool_ceiling, ">poolCeiling");
         uint256 _price_collateral = getCollateralPrice();
-        uint256 _collateral_value = (_collateral_amount * (10**missing_decimals)).mul(_price_collateral).div(PRICE_PRECISION);
-        uint256 _total_dollar_value = _collateral_value.mul(COLLATERAL_RATIO_PRECISION).div(_target_collateral_ratio);
-        uint256 _required_share_amount = _total_dollar_value.sub(_collateral_value).mul(PRICE_PRECISION).div(_share_price);
+        uint256 _total_dollar_value = 0;
+        uint256 _required_share_amount = 0;
+        if (_target_collateral_ratio > 0) {
+            uint256 _collateral_value = (_collateral_amount * (10**missing_decimals)).mul(_price_collateral).div(PRICE_PRECISION);
+            _total_dollar_value = _collateral_value.mul(COLLATERAL_RATIO_PRECISION).div(_target_collateral_ratio);
+            if (_target_collateral_ratio < COLLATERAL_RATIO_MAX) {
+                _required_share_amount = _total_dollar_value.sub(_collateral_value).mul(PRICE_PRECISION).div(_share_price);
+            }
+        } else {
+            _total_dollar_value = _share_amount.mul(_share_price).div(PRICE_PRECISION);
+        }
         uint256 _actual_dollar_amount = _total_dollar_value.sub((_total_dollar_value.mul(_minting_fee)).div(PRICE_PRECISION));
-
         require(_dollar_out_min <= _actual_dollar_amount, ">slippage");
-        require(_required_share_amount <= _share_amount, "<shareBalance");
 
         if (_required_share_amount > 0) {
+            require(_required_share_amount <= _share_amount, "<shareBalance");
             IShare(share).poolBurnFrom(msg.sender, _required_share_amount);
         }
         if (_collateral_amount > 0) {
