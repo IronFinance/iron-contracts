@@ -28,11 +28,11 @@ contract Share is ERC20Custom, Operator {
     bool public initialized;
 
     // DISTRIBUTION
-    uint256 public constant COMMUNITY_REWARD_ALLOCATION = 80000000 ether; // 84M
-    uint256 public constant DEV_FUND_ALLOCATION = 20000000 ether; // 16M
+    uint256 public constant COMMUNITY_REWARD_ALLOCATION = 8_000_0000 ether; // 80M
+    uint256 public constant DEV_FUND_ALLOCATION = 2_000_0000 ether; // 20M
     uint256 public constant VESTING_DURATION = 365 days; // 12 months
     uint256 public startTime; // Start time of vesting duration
-    uint256 public endTime = startTime + VESTING_DURATION; // End of vesting duration
+    uint256 public endTime; // End of vesting duration
     address public devFund;
     address public rewardController; // Holding SHARE tokens to distribute into Liquiditiy Mining Pools
     uint256 public devFundLastClaimed;
@@ -69,6 +69,7 @@ contract Share is ERC20Custom, Operator {
         devFund = _devFund;
         rewardController = _rewardController;
         startTime = _startTime;
+        endTime = _startTime + VESTING_DURATION;
         devFundLastClaimed = _startTime;
     }
 
@@ -114,6 +115,7 @@ contract Share is ERC20Custom, Operator {
     }
 
     function claimDevFundRewards() external {
+        require(msg.sender == devFund, "!dev");
         uint256 _pending = unclaimedDevFund();
         if (_pending > 0 && devFund != address(0)) {
             _mint(devFund, _pending);
